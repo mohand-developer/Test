@@ -1,4 +1,4 @@
-﻿﻿// =====================================================
+// =====================================================
 // Firebase Integration - MAHFOOR CNC
 // تُحمَّل من firebase-bridge.js (script عادي غير module)
 // =====================================================
@@ -8,18 +8,27 @@ var _listenToOrders = window._listenToOrders || null;
 var _clearAllOrdersFromFirebase = window._clearAllOrdersFromFirebase || null;
 var _firebaseReady = false;
 
-// التحقق من Firebase كل 500ms حتى يصبح جاهزًا
-(function waitForFirebase() {
-  if (window._firebaseReady) {
+// الاستماع لـ event من firebase-bridge.js
+function _onFirebaseReady() {
+  if (window._firebaseReady && window._saveOrderToFirebase) {
     _saveOrderToFirebase = window._saveOrderToFirebase;
     _listenToOrders = window._listenToOrders;
     _clearAllOrdersFromFirebase = window._clearAllOrdersFromFirebase;
     _firebaseReady = true;
     console.log("✅ Firebase متصل بـ script.js");
   } else {
-    setTimeout(waitForFirebase, 500);
+    console.warn("⚠️ Firebase غير متاح، سيعمل محلياً");
   }
-})();
+}
+// إذا Firebase جاهز بالفعل (module سبق script)
+if (window._firebaseReady) {
+  _onFirebaseReady();
+} else {
+  // انتظر event من firebase-bridge.js
+  window.addEventListener('firebaseReady', _onFirebaseReady, { once: true });
+  // fallback: بعد 5 ثواني لو العدني ما جاش
+  setTimeout(() => { if (!_firebaseReady) _onFirebaseReady(); }, 5000);
+}
 
 const whatsappNumber = "+201033662370";
 // Password to allow forced clearing of all orders (change here if needed)
@@ -454,19 +463,28 @@ function verifyPassword() {
   if (enteredPassword === ADMIN_PASSWORD) {
     document.getElementById('password-modal').style.display = 'none';
     document.getElementById('admin-content').style.display = 'block';
-    // استخدام Firebase real-time listener لو متاح
-    if (_firebaseReady && _listenToOrders) {
-      _listenToOrders((orders) => {
-        // تحديث localStorage بالبيانات الجديدة من Firebase
-        localStorage.setItem('mahfourOrders', JSON.stringify(orders));
-        renderOrders(orders);
-        updateStats();
-      });
-    } else {
-      renderOrders();
-      updateStats();
-    }
     renderAdminProducts();
+    // انتظر Firebase يكون جاهز ثم ابدأ الاستماع
+    function startAdminFirebase() {
+      if (window._firebaseReady && window._listenToOrders) {
+        _firebaseReady = true;
+        _listenToOrders = window._listenToOrders;
+        _listenToOrders((orders) => {
+          localStorage.setItem('mahfourOrders', JSON.stringify(orders));
+          renderOrders(orders);
+          updateStats();
+          renderAdminProducts();
+        });
+        console.log('✅ Admin: Firebase listener نشط');
+      } else {
+        // Firebase لسه مش جاهز، اعرض من localStorage مؤقتاً
+        renderOrders();
+        updateStats();
+        // استمر في المحاولة كل ثانية
+        setTimeout(startAdminFirebase, 1000);
+      }
+    }
+    startAdminFirebase();
     return true;
   } else {
     Swal.fire({
@@ -1506,6 +1524,7 @@ function setupManagementFilters() {
 // Update stats
 function updateStats() {
   const orders = JSON.parse(localStorage.getItem('mahfourOrders')) || [];
+  // ملاحظة: localStorage يتم تحديثه تلقائياً من Firebase listener في verifyPassword
   document.getElementById('total-orders').textContent = orders.length;
   let totalSales = 0;
   const productCounts = {};
