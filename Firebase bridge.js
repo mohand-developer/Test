@@ -1,7 +1,6 @@
 // =====================================================
 // Firebase Bridge - MAHFOOR CNC
-// يُحمَّل قبل script.js كـ <script type="module">
-// يعرض دوال Firebase على window عشان script.js يستخدمها
+// يُحمَّل كـ <script type="module"> قبل script.js
 // =====================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
@@ -83,8 +82,12 @@ try {
 
   window._firebaseReady = true;
   console.log("✅ Firebase Bridge جاهز");
+  
+  // أطلق event عشان script.js يعرف إن Firebase جاهز
+  window.dispatchEvent(new Event('firebaseReady'));
 
 } catch (e) {
-  console.warn("⚠️ Firebase Bridge فشل التهيئة:", e);
+  console.warn("⚠️ Firebase Bridge فشل:", e);
   window._firebaseReady = false;
+  window.dispatchEvent(new Event('firebaseReady'));
 }
