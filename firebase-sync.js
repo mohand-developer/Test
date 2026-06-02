@@ -52,6 +52,8 @@ const MAHFOOR_FIREBASE = (() => {
       db = firebase.database();
       initialized = true;
       window._mahfoorFirebaseReady = true;
+      // أبلغ script.js إن Firebase جاهز
+      window.dispatchEvent(new CustomEvent('mahfoor-firebase-ready'));
       console.log('✅ MAHFOOR Firebase: connected');
     } catch (err) {
       console.warn('⚠️ MAHFOOR Firebase: failed to init, working offline only', err);
@@ -323,10 +325,10 @@ const MAHFOOR_FIREBASE = (() => {
     }
     db.ref('mahfoor_availability').on('value', (snapshot) => {
       const data = snapshot.val() || {};
-      // حوّل البيانات لـ map بسيط: { productId: available }
+      // الـ key هو String(productId) دايماً
       const availMap = {};
       Object.values(data).forEach(item => {
-        availMap[item.id] = item.available;
+        availMap[String(item.id)] = item.available;
       });
       callback(availMap);
     });
