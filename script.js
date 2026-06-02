@@ -1,4 +1,4 @@
-﻿const whatsappNumber = "+201033662370";
+const whatsappNumber = "+201033662370";
 // Password to allow forced clearing of all orders (change here if needed)
 const CLEAR_ORDERS_PASSWORD = "123";
 const ADMIN_PASSWORD = "22/7/2009";
@@ -412,34 +412,43 @@ function initializeProducts() {
     productsData = JSON.parse(localStorage.getItem('mahfourProducts')) || productsDataDefault;
   }
 
-  // ← مزامنة Firebase: اجلب حالة التوفر الحقيقية من السيرفر
-  // وطبّقها على المنتجات فور ما تتغير (real-time)
+  // مزامنة Firebase: اجلب حالة التوفر الحقيقية من السيرفر
   if (typeof MAHFOOR_FIREBASE !== 'undefined') {
-    // انتظر Firebase يتهيأ ثم اشترك في التغييرات
+
     const _applyAvailability = () => {
       MAHFOOR_FIREBASE.listenToProductAvailability((availMap) => {
-        if (!Object.keys(availMap).length) return; // مفيش بيانات في Firebase بعد
+        if (!availMap || !Object.keys(availMap).length) return;
         let changed = false;
         productsData.forEach(p => {
-          if (availMap.hasOwnProperty(p.id) && p.available !== availMap[p.id]) {
-            p.available = availMap[p.id];
-            changed = true;
+          // تحويل الـ key لـ string لأن Firebase يرجعه string دايماً
+          const key = String(p.id);
+          if (availMap.hasOwnProperty(key)) {
+            const newVal = availMap[key];
+            if (p.available !== newVal) {
+              p.available = newVal;
+              changed = true;
+            }
           }
         });
         if (changed) {
           localStorage.setItem('mahfourProducts', JSON.stringify(productsData));
-          // أعد رسم المنتجات لو الصفحة الرئيسية مفتوحة
           try { renderProducts(); } catch(e) {}
           try { setupProductDetails(); } catch(e) {}
         }
       });
     };
 
-    // لو Firebase اتهيأ بالفعل، اشترك فوراً. لو لأ، انتظر ثانية
+    // استخدم event بدل setTimeout لضمان تشغيله بعد Firebase بالظبط
     if (window._mahfoorFirebaseReady) {
       _applyAvailability();
     } else {
-      setTimeout(_applyAvailability, 1500);
+      // استمع لـ custom event بيتبعت من firebase-sync.js لما يتهيأ
+      window.addEventListener('mahfoor-firebase-ready', _applyAvailability, { once: true });
+      // fallback بعد 4 ثواني لو الـ event مجاش
+      setTimeout(() => {
+        if (!window._mahfoorFirebaseReady) return;
+        _applyAvailability();
+      }, 4000);
     }
   }
 }
